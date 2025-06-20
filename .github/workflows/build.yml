@@ -1,0 +1,69 @@
+name: Build and Package Plugins
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  check-stop-file:
+    runs-on: ubuntu-latest
+    outputs:
+      skip_build: ${{ steps.check.outputs.skip_build }}
+    steps:
+      - name: Check for stop_auto_build file
+        id: check
+        run: |
+          if [ -f "stop_auto_build" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "skip_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    needs: check-stop-file
+    if: ${{ needs.check-stop-file.outputs.skip_build == 'false' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Build plugins
+        run: npm run build
+
+  package:
+    runs-on: macos-latest
+    needs: [check-stop-file, build]
+    if: ${{ needs.check-stop-file.outputs.skip_build == 'false' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          
+      - name: Set version from package.json
+        run: node -p -e '`VERSION=${require("./package.json").version}`' >> $GITHUB_ENV
+        
+      - name: Print version
+        run: echo "Plugin version: ${{ env.VERSION }}"
+        
+      - name: Print environment info
+        run: env | sort
+
+  skip-notification:
+    runs-on: ubuntu-latest
+    needs: check-stop-file
+    if: ${{ needs

@@ -1,19 +1,5 @@
-# MusicFree 插件模板
-
-## 前置依赖
-
-需要安装 node 环境。
-
-## 使用方式
-
-### clone 本模板，并安装依赖
-
-```bash
-git clone https://github.com/maotoumao/MusicFreePluginTemplate.git
-cd MusicFreePluginTemplate
-npm install
-```
-
+# MusicFree 插件模板 - 自动部署
+（原项目：[Maotoumao/MusicFreePluginTemplate](https://github.com/maotoumao/MusicFreePluginTemplate)）
 ### 开发插件
 
 src/index.ts 中默认导出了插件的实例。你只需要关注如何完善插件的逻辑，也就是把 pluginInstance 中的内容补充完整即可。
@@ -57,12 +43,7 @@ declare namespace IMusic {
 
 ### 构建插件
 
-你可以执行以下指令来生成插件：
-
-```bash
-npm run build
-```
-
+打开Github Actions后手动部署，你也可以自动部署。（如果暂时不需要，需要先在项目根目录中创建stop_auto_build文件）
 插件会被打包到根目录下 ```dist/plugin.js``` 文件中，你可以直接在 MusicFree 桌面版或安卓版安装这个 js 文件。如果你想调试某个函数，也可以直接执行 ```npm run dev``` 来直接执行插件。理论上在 node 环境下执行结果和在端内执行结果无差别。
 
 **你可以切到 demo 分支查看示例代码。**
