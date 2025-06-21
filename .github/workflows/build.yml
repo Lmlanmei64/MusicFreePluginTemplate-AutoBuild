@@ -1,4 +1,4 @@
-name: Build and Package Plugins
+name: Build Plugins
 
 on:
   push:
@@ -6,64 +6,37 @@ on:
   workflow_dispatch: # 允许手动触发
 
 jobs:
-  check-stop-file:
-    runs-on: ubuntu-latest
-    outputs:
-      skip_build: ${{ steps.check.outputs.skip_build }}
-    steps:
-      - name: Check for stop_auto_build file
-        id: check
-        run: |
-          if [ -f "stop_auto_build" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-            echo "skip_build=true" >> $GITHUB_OUTPUT
-          else
-            echo "skip_build=false" >> $GITHUB_OUTPUT
-          fi
-
   build:
     runs-on: ubuntu-latest
-    needs: check-stop-file
-    if: ${{ needs.check-stop-file.outputs.skip_build == 'false' }}
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          
-      - name: Install dependencies
-        run: npm install
-        
-      - name: Build plugins
-        run: npm run build
 
-  package:
-    runs-on: macos-latest
-    needs: [check-stop-file, build]
-    if: ${{ needs.check-stop-file.outputs.skip_build == 'false' }}
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16
-          
-      - name: Set version from package.json
-        run: node -p -e '`VERSION=${require("./package.json").version}`' >> $GITHUB_ENV
-        
-      - name: Print version
-        run: echo "Plugin version: ${{ env.VERSION }}"
-        
-      - name: Print environment info
-        run: env | sort
+    - name: Check for stop_auto_build file
+      id: check-stop-file
+      run: |
+        if [ -f "stop_auto_build" ]; then
+          echo "stop_file_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "stop_file_exists=false" >> $GITHUB_OUTPUT
+        fi
 
-  skip-notification:
-    runs-on: ubuntu-latest
-    needs: check-stop-file
-    if: ${{ needs
+    - name: Checkout code
+      uses: actions/checkout@v4
+      if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'false' || github.event_name == 'workflow_dispatch' }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+      if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'false' || github.event_name == 'workflow_dispatch' }}
+
+    - name: Install dependencies
+      run: npm install
+      if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'false' || github.event_name == 'workflow_dispatch' }}
+
+    - name: Build plugins
+      run: npm run build
+      if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'false' || github.event_name == 'workflow_dispatch' }}
+
+    - name: Skip build notification
+      if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'true' && github.event_name != 'workflow_dispatch' }}
+      run: echo "Skipping build due to presence of stop_auto_build file"
