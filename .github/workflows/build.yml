@@ -1,4 +1,4 @@
-name: Build Plugins
+name: Build and Deploy Plugins
 
 on:
   push:
@@ -6,10 +6,11 @@ on:
   workflow_dispatch: # 允许手动触发
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
+    # 检查停止构建文件
     - name: Check for stop_auto_build file
       id: check-stop-file
       run: |
@@ -19,24 +20,48 @@ jobs:
           echo "stop_file_exists=false" >> $GITHUB_OUTPUT
         fi
 
+    # 检出代码（仅当需要构建时）
     - name: Checkout code
       uses: actions/checkout@v4
       if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'false' || github.event_name == 'workflow_dispatch' }}
+      with:
+        persist-credentials: false
 
+    # 设置 Node.js 环境
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 18
+        node-version: 16
       if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'false' || github.event_name == 'workflow_dispatch' }}
 
+    # 安装依赖
     - name: Install dependencies
-      run: npm install
+      run: npm ci
       if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'false' || github.event_name == 'workflow_dispatch' }}
 
+    # 构建插件
     - name: Build plugins
       run: npm run build
       if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'false' || github.event_name == 'workflow_dispatch' }}
 
+    # 上传构建产物到仓库
+    - name: Commit and push dist directory
+      if: ${{ (steps.check-stop-file.outputs.stop_file_exists == 'false' || github.event_name == 'workflow_dispatch') && success() }}
+      run: |
+        # 配置 Git 用户
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        
+        # 添加 dist 目录并提交
+        git add dist
+        if git diff-index --quiet HEAD --; then
+          echo "No changes in dist directory"
+        else
+          git commit -m "chore: auto-build plugins [skip ci]"
+          git push
+        fi
+
+    # 跳过构建的通知
     - name: Skip build notification
       if: ${{ steps.check-stop-file.outputs.stop_file_exists == 'true' && github.event_name != 'workflow_dispatch' }}
-      run: echo "Skipping build due to presence of stop_auto_build file"
+      run: echo "🛑 Skipping build due to presence of stop_auto_build file"
